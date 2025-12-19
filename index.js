@@ -9,6 +9,32 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const admin = require("firebase-admin");
+
+const decoded = Buffer.from(process.env.FB_KEY, "base64").toString("utf8");
+const serviceAccount = JSON.parse(decoded);
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+const verifyFBToken = async (req, res, next) => {
+  const token = req.headers.authorization;
+  if (!token) {
+    return res.status(401).send({ message: "unauthorize access" });
+  }
+  try {
+    const idToken = token.split(" ")[1];
+    console.log(idToken);
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    console.log("decoded id token", decoded);
+    req.decoded_email = decoded.email;
+    next();
+  } catch (error) {
+    return res.status(401).send({ message: "unauthorize access" });
+  }
+};
+
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.cgi21.mongodb.net/?appName=Cluster0`;
 
 const client = new MongoClient(uri, {
@@ -46,7 +72,7 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/blood-donation-request", async (req, res) => {
+    app.post("/blood-donation-request", verifyFBToken, async (req, res) => {
       const DonationRequesterInfo = req.body;
 
       const result = await bloodDonationRequest.insertOne(
