@@ -25,10 +25,12 @@ async function run() {
 
     const database = client.db("BloodDonationDB");
     const userCollection = database.collection("user");
+    const bloodDonationRequest = database.collection("donationRequest");
 
     app.post("/user", async (req, res) => {
       const userInfo = req.body;
       userInfo.role = "donor";
+      userInfo.status = "active";
       userInfo.createdAt = new Date();
 
       const result = await userCollection.insertOne(userInfo);
@@ -41,6 +43,15 @@ async function run() {
       console.log(email);
       const query = { email: email };
       const result = await userCollection.findOne(query);
+      res.send(result);
+    });
+
+    app.post("/blood-donation-request", async (req, res) => {
+      const DonationRequesterInfo = req.body;
+
+      const result = await bloodDonationRequest.insertOne(
+        DonationRequesterInfo
+      );
       res.send(result);
     });
 
