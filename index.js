@@ -64,6 +64,11 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/user", verifyFBToken, async (req, res) => {
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    });
+
     app.get("/user/role/:email", async (req, res) => {
       const { email } = req.params;
       console.log(email);
