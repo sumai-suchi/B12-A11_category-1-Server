@@ -125,6 +125,13 @@ async function run() {
       const result = await bloodDonationRequest.findOne(query);
       res.send(result);
     });
+    app.delete("/userRequest/:id", verifyFBToken, async (req, res) => {
+      const { id } = req.params;
+      console.log(id);
+      const query = { _id: new ObjectId(id) };
+      const result = await bloodDonationRequest.deleteOne(query);
+      res.send(result);
+    });
 
     app.patch(
       "/update/singleUserRequest/:id",
