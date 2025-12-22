@@ -125,6 +125,7 @@ async function run() {
       const result = await bloodDonationRequest.findOne(query);
       res.send(result);
     });
+
     app.delete("/userRequest/:id", verifyFBToken, async (req, res) => {
       const { id } = req.params;
       console.log(id);
@@ -164,6 +165,29 @@ async function run() {
       }
     );
 
+    app.patch("/update/singleUser", verifyFBToken, async (req, res) => {
+      const { email } = req.query;
+      const query = { email: email };
+      const userInfo = req.body;
+      console.log(userInfo);
+      const UpdateOne = {
+        $set: {
+          name: userInfo.name,
+          email: userInfo.email,
+          mainPhotoUrl: userInfo.mainPhotoUrl,
+          bloodGroup: userInfo.bloodGroup,
+          districts: userInfo.districts,
+          upazila: userInfo.upazila,
+          role: userInfo.role,
+          status: userInfo.status,
+          createdAt: userInfo.createdAt,
+        },
+      };
+
+      const result = await userCollection.updateOne(query, UpdateOne);
+      console.log(userInfo);
+      res.send(result);
+    });
     app.post("/blood-donation-request", verifyFBToken, async (req, res) => {
       const DonationRequesterInfo = req.body;
 
