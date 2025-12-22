@@ -2,7 +2,8 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-
+const stripe = require("stripe")(process.env.STRIPE_SECRATE);
+const crypto = require("crypto");
 const port = process.env.PORT || 5000;
 
 const app = express();
@@ -25,9 +26,9 @@ const verifyFBToken = async (req, res, next) => {
   }
   try {
     const idToken = token.split(" ")[1];
-    console.log(idToken);
+    // console.log(idToken);
     const decoded = await admin.auth().verifyIdToken(idToken);
-    console.log("decoded id token", decoded);
+    // console.log("decoded id token", decoded);
     req.decoded_email = decoded.email;
     next();
   } catch (error) {
@@ -71,7 +72,14 @@ async function run() {
 
     app.get("/user/role/:email", async (req, res) => {
       const { email } = req.params;
-      console.log(email);
+      // console.log(email);
+      const query = { email: email };
+      const result = await userCollection.findOne(query);
+      res.send(result);
+    });
+    app.get("/user/role/data/:email", verifyFBToken, async (req, res) => {
+      const { email } = req.params;
+      // console.log(email);
       const query = { email: email };
       const result = await userCollection.findOne(query);
       res.send(result);
@@ -80,7 +88,7 @@ async function run() {
     app.get("/my-donation-request", verifyFBToken, async (req, res) => {
       const { limit } = req.query;
       const email = req.decoded_email;
-      console.log(email);
+      // console.log(email);
       const query = { requesterEmail: email };
       const limitNum = Number(limit) || 0;
       console.log(limitNum);
@@ -89,6 +97,19 @@ async function run() {
         .find(query)
         .limit(limitNum)
         .toArray();
+      return res.send(result);
+    });
+    app.get("/all-donation-request", verifyFBToken, async (req, res) => {
+      const result = await bloodDonationRequest.find().toArray();
+      return res.send(result);
+    });
+
+    app.get("/pending-request", async (req, res) => {
+      const { status } = req.query;
+
+      const query = { donationStatus: status };
+
+      const result = await bloodDonationRequest.find(query).toArray();
       return res.send(result);
     });
 
@@ -104,9 +125,22 @@ async function run() {
       const result = await userCollection.updateOne(query, updateStatus);
       return res.send(result);
     });
+
+    app.patch("/update/user/role", verifyFBToken, async (req, res) => {
+      const { email, role } = req.query;
+      const query = { email: email };
+      const updateStatus = {
+        $set: {
+          role: role,
+        },
+      };
+
+      const result = await userCollection.updateOne(query, updateStatus);
+      return res.send(result);
+    });
     app.patch("/update/userRequest/status", verifyFBToken, async (req, res) => {
       const { donationStatus, id } = req.query;
-      console.log(donationStatus, id);
+      // console.log(donationStatus, id);
       const query = { _id: new ObjectId(id) };
       const updateStatus = {
         $set: {
@@ -120,7 +154,7 @@ async function run() {
 
     app.get("/userRequest/:id", verifyFBToken, async (req, res) => {
       const { id } = req.params;
-      console.log(id);
+      // console.log(id);
       const query = { _id: new ObjectId(id) };
       const result = await bloodDonationRequest.findOne(query);
       res.send(result);
@@ -139,10 +173,10 @@ async function run() {
       verifyFBToken,
       async (req, res) => {
         const { id } = req.params;
-        console.log(id);
+        // console.log(id);
         const query = { _id: new ObjectId(id) };
         const userInfo = req.body;
-        console.log(userInfo);
+        // console.log(userInfo);
         const UpdateOne = {
           $set: {
             requesterName: userInfo.requesterName,
@@ -197,10 +231,39 @@ async function run() {
       res.send(result);
     });
 
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    app.post("/create-payment-checkOut", async (req, res) => {
+      const userPaymentInfo = req.body;
+      console.log(userPaymentInfo);
+      const amount = parseInt(userPaymentInfo.donateAmount) * 100;
+      const session = await stripe.checkout.sessions.create({
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              unit_amount: amount,
+              product_data: {
+                name: "please donate",
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        mode: "payment",
+        metadata: {
+          donorName: userPaymentInfo?.donorName,
+        },
+        customer_email: userPaymentInfo?.donorEmail,
+        success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.SITE_DOMAIN}/payment-cancelled`,
+      });
+
+      res.send({ url: session.url });
+    });
+
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // await client.close();
   }

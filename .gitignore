@@ -1,3 +1,5 @@
 node_modules
 .env
 BloodCare.json
+.vercel
+vercel.json
